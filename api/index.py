@@ -34,7 +34,7 @@ app.add_middleware(
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL_PRIMARY = "meta-llama/llama-3.3-70b-instruct:free"
-MODEL_FALLBACK = "deepseek/deepseek-chat"
+MODEL_FALLBACK = "qwen/qwen-2.5-vl-7b-instruct:free"
 
 # ============================================================================
 # MODELS - Según el .md y el código Django
