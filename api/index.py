@@ -33,7 +33,7 @@ app.add_middleware(
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_PRIMARY = "google/gemini-2.0-flash-exp:free"
+MODEL_PRIMARY = "meta-llama/llama-3.3-70b-instruct:free"
 MODEL_FALLBACK = "deepseek/deepseek-chat"
 
 # ============================================================================
