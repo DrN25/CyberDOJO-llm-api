@@ -204,7 +204,7 @@ def call_openrouter(messages: List[Dict], model: str) -> str:
             "model": model,
             "messages": messages,
             "temperature": 0.8, # Un poco más alto para creatividad en el engaño
-            "max_tokens": 1000,
+            "max_tokens": 5000,
             "top_p": 0.9,
             # ESTA LÍNEA ES LA CLAVE PARA EVITAR ERRORES DE PARSEO:
             "response_format": { "type": "json_object" }
