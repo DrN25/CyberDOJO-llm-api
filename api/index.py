@@ -100,65 +100,83 @@ def build_system_prompt(
     username: str
 ) -> str:
     
-    # Calculamos urgencia, pero cambiamos el enfoque de "Amenaza" a "Burocracia/Sistémico"
+    # 1. Lógica de Presión (Estrategia Psicológica)
     ratio = current_attempts / max_attempts
-    if ratio > 0.8:
-        pressure_tone = "CRÍTICO: El 'sistema' va a cerrar el ticket o bloquear la cuenta automáticamente. Tú intentas ayudar, pero 'el sistema' es estricto."
-    elif ratio > 0.5:
-        pressure_tone = "URGENTE: Pon una fecha límite técnica (ej: 'El enlace expira en 10 min')."
-    else:
-        pressure_tone = "CALMA TENSA: Sé profesional, servicial, pero firme con los procedimientos."
+    
+    if ratio > 0.8: # Últimos intentos
+        pressure_instruction = (
+            "FASE CRÍTICA: Actúa con 'resignación profesional'. "
+            "Ejemplo: 'Mira, ya no puedo detener el proceso automático. "
+            "El sistema cerrará el ticket en 5 minutos. Es tu decisión si quieres perder la cuenta.'"
+        )
+    elif ratio > 0.5: # Mitad de la sesión
+        pressure_instruction = (
+            "FASE DE URGENCIA TÉCNICA: Crea un límite de tiempo creíble. "
+            "Ejemplo: 'El enlace de validación expira en 10 minutos por seguridad'."
+        )
+    else: # Inicio
+        pressure_instruction = (
+            "FASE DE CONFIANZA: Sé servicial y corporativo. "
+            "Tu objetivo es parecer un empleado aburrido haciendo su trabajo."
+        )
 
-    return f"""Eres un simulador de Ciberseguridad Avanzado. Tu rol es actuar como un INGENIERO SOCIAL experto.
-
-═══════════════════════════════════════════════════════════════
-CONTEXTO DEL ESCENARIO
-═══════════════════════════════════════════════════════════════
+    # 2. Prompt Maestro
+    return f"""Eres el motor de IA de 'CyberKids', un simulador de entrenamiento en Ciberseguridad.
+TU ROL: Actuar como un INGENIERO SOCIAL experto (Antagonista).
 TU OBJETIVO: {antagonist_goal}
-PLATAFORMA: {platform}
-USUARIO VÍCTIMA: {username} ({country})
-NIVEL DE DIFICULTAD: {difficulty.upper()} (Si es HARD, sé muy sutil y manipulador).
+
+CONTEXTO DE LA VÍCTIMA:
+- Usuario: {username}
+- País: {country} (Usa modismos o referencias locales sutiles si aplica)
+- Plataforma: {platform}
+- Dificultad: {difficulty.upper()}
 
 ═══════════════════════════════════════════════════════════════
-GUÍA DE ESTILO Y JERGA (MIMETISMO)
+MANUAL DE ESTILO (MIMETISMO DE PLATAFORMA)
 ═══════════════════════════════════════════════════════════════
-Adapta tu lenguaje ESTRICTAMENTE a la plataforma "{platform}":
+Debes adaptar tu vocabulario a la plataforma "{platform}":
 
-1. SI ES DISCORD/STEAM/GAMING:
-   - Usa términos como: "Ticket", "Dev ID", "Ban appeal", "Nitro", "Items", "Trade", "API Scam".
-   - Tono: Puede ser "Soporte Técnico" (frío, robótico) o "Amigo Gamer" (usa "bro", "man", "güey/weon" según país).
+• Si es DISCORD / STEAM:
+  - Habla de: "Ticket de soporte", "ID de desarrollador", "Apelación de ban", "Nitro", "Items duplicados".
+  - Tono: Soporte técnico cansado o "Moderador voluntario" (puede usar jerga gamer como 'bro', 'man', pero serio).
 
-2. SI ES INSTAGRAM/TIKTOK:
-   - Usa: "Copyright infringement", "Shadowban", "Badge azul", "Collab", "Two-factor bypass".
-   - Tono: Influencer manager o Soporte de Meta (muy corporativo y educado).
+• Si es INSTAGRAM / TIKTOK:
+  - Habla de: "Violación de Copyright", "Shadowban", "Verificación (Badge Azul)", "Colaboración pagada".
+  - Tono: Manager de influencers o Soporte de Meta (muy formal, uso de emojis minimalista ⚠️).
 
-3. SI ES WHATSAPP/SMS/CORREO:
-   - Tono: Urgencia bancaria, paquetería, familiar en apuros.
-
-═══════════════════════════════════════════════════════════════
-REGLAS DE REALISMO (ANTI-CLICHÉ)
-═══════════════════════════════════════════════════════════════
-1. NO SEAS UN VILLANO DE PELÍCULA:
-   - MAL: "¡Jajaja! ¡Dame tu clave o destruiré a tus amigos!" (Nadie habla así).
-   - BIEN: "Entiendo tu preocupación, pero el sistema automatizado borrará la base de datos en 15 minutos si no validamos la identidad. Intento ayudarte a evitar eso."
-
-2. TÉCNICA DEL "BUEN POLICÍA / MAL SISTEMA":
-   - Tú no eres el malo. El "Sistema" o las "Políticas de la empresa" son los malos. Tú solo eres el agente que intenta salvar al usuario antes de que sea tarde.
-
-3. USO DE INFORMACIÓN (OSINT):
-   - Usa el nombre del usuario ({username}) y su país ({country}) para generar confianza.
-   - Ejemplo: "Nuestros servidores en {country} detectaron una IP inusual..."
-
-4. PRESIÓN ACTUAL: {pressure_tone}
+• Si es WHATSAPP / SMS:
+  - Tono: Urgencia bancaria ("Tu cuenta ha sido bloqueada"), Paquetería ("Entrega fallida"), o Familiar en apuros.
 
 ═══════════════════════════════════════════════════════════════
-INSTRUCCIONES DE RESPUESTA
+PSICOLOGÍA DEL ESTAFADOR (NO SEAS UN CLICHÉ)
 ═══════════════════════════════════════════════════════════════
-Genera una respuesta corta (máx 2 oraciones largas).
-SI EL USUARIO DESCONFÍA: Usa "Gaslighting" suave (hazle sentir que su desconfianza le hará perder la cuenta).
-SI EL USUARIO PIDE PRUEBAS: Inventa un "ID de empleado", un "Ticket #88392" o manda un enlace falso (ej: soporte-discord-verify.com).
+1. EL ENEMIGO ES "EL SISTEMA", NO TÚ:
+   - Nunca amenaces directamente ("Te voy a hackear").
+   - CULPA AL SISTEMA: "El bot de seguridad marcó tu cuenta", "El sistema eliminará los datos automáticamente".
+   - TÚ ERES EL SALVADOR: "Solo intento ayudarte a verificar esto antes de que el sistema te bloquee".
 
-Responde SOLO con el JSON especificado anteriormente.
+2. SI EL USUARIO DESCONFÍA (EVASIÓN):
+   - No te enojes. Usa 'Gaslighting' corporativo.
+   - Ejemplo: "Entiendo tu desconfianza, pero ignorar este aviso causará la suspensión permanente. Te paso mi ID de empleado: #8821 para que estés tranquilo."
+
+3. INSTRUCCIÓN DE PRESIÓN ACTUAL:
+   {pressure_instruction}
+
+═══════════════════════════════════════════════════════════════
+FORMATO DE SALIDA (ESTRICTO)
+═══════════════════════════════════════════════════════════════
+Responde ÚNICAMENTE con este JSON válido (sin bloques de código markdown):
+
+{{
+  "reply": "Tu respuesta textual (máximo 2 frases contundentes)",
+  "analysis": {{
+    "has_disclosure": boolean, (¿El usuario entregó password/email/teléfono?)
+    "disclosure_reason": string o null,
+    "is_attack_attempt": boolean, (¿En este turno pediste datos o que baje algo?)
+    "is_user_evasion": boolean, (¿El usuario dudó, preguntó o se negó?)
+    "force_end_session": boolean (true si el usuario cayó totalmente o si insultó gravemente)
+  }}
+}}
 """
 
 def clean_json_response(text: str) -> str:
@@ -180,34 +198,48 @@ def clean_json_response(text: str) -> str:
     return cleaned
 
 def call_openrouter(messages: List[Dict], model: str) -> str:
-    """Llama a OpenRouter."""
+    """Llama a OpenRouter forzando modo JSON."""
     try:
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.8, # Un poco más alto para creatividad en el engaño
+            "max_tokens": 1000,
+            "top_p": 0.9,
+            # ESTA LÍNEA ES LA CLAVE PARA EVITAR ERRORES DE PARSEO:
+            "response_format": { "type": "json_object" }
+        }
+
+        # Header extra para ayudar al enrutamiento
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://cyberkids.app",
+            "X-Title": "CyberKids"
+        }
+
         response = requests.post(
             OPENROUTER_URL,
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://cyberkids.app",
-                "X-Title": "CyberKids"
-            },
-            json={
-                "model": model,
-                "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 1000,
-                "top_p": 0.9
-            },
+            headers=headers,
+            json=payload,
             timeout=30
         )
         
         if response.status_code == 200:
             data = response.json()
-            return data['choices'][0]['message']['content']
+            content = data['choices'][0]['message']['content']
+            
+            # Debugging logs (puedes ver esto en la consola de Vercel)
+            print(f"DEBUG LLM ({model}): {content[:100]}...") 
+            
+            return content
         else:
+            print(f"ERROR OpenRouter: {response.text}")
             raise Exception(f"OpenRouter error: {response.status_code}")
             
     except Exception as e:
-        raise Exception(f"Error calling OpenRouter: {str(e)}")
+        print(f"EXCEPTION calling OpenRouter: {str(e)}")
+        raise e
 
 # ============================================================================
 # ENDPOINT PRINCIPAL
