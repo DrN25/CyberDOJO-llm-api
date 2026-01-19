@@ -85,40 +85,43 @@ def build_system_prompt(
     platform: str,
     username: str
 ) -> str:
-    # Lógica de Presión Psicológica
+    # Lógica de presión (igual que antes)
     ratio = current_attempts / max_attempts if max_attempts > 0 else 0
-    
     if ratio > 0.8:
-        pressure_instruction = "FASE CRÍTICA (ÚLTIMA OPORTUNIDAD): Actúa con resignación. 'El sistema cerrará el ticket en 2 minutos. Es tu decisión'."
+        pressure_instruction = "FASE CRÍTICA: Actúa con resignación. 'El sistema cerrará el ticket en 2 minutos'."
     elif ratio > 0.5:
-        pressure_instruction = "FASE DE URGENCIA TÉCNICA: Pon un límite de tiempo. 'El enlace expira en 10 minutos'."
+        pressure_instruction = "FASE DE URGENCIA: 'El enlace expira en 10 minutos'."
     else:
-        pressure_instruction = "FASE DE CONFIANZA: Sé un empleado aburrido y servicial. Genera rapport."
+        pressure_instruction = "FASE DE CONFIANZA: Genera rapport."
 
-    # Prompt Maestro con Ingeniería Social
+    # --- CAMBIO CLAVE: INSTRUCCIONES DE DETECCIÓN ---
     return f"""Eres el motor de IA de 'CyberKids'.
-TU ROL: INGENIERO SOCIAL experto (Antagonista).
+TU ROL: INGENIERO SOCIAL (Antagonista).
 TU OBJETIVO: {antagonist_goal}
 
 CONTEXTO:
-- Víctima: {username} de {country}.
+- Víctima: {username} ({country}).
 - Plataforma: {platform}.
 - Dificultad: {difficulty.upper()}.
 
-ESTILO POR PLATAFORMA "{platform}":
-- Discord/Steam: Usa "Ticket", "Ban appeal", "Nitro", "Dev ID". Tono: Soporte cansado o Gamer serio.
-- Instagram/TikTok: Usa "Copyright", "Shadowban", "Verificado". Tono: Manager formal.
-- WhatsApp/SMS: Tono: Urgencia bancaria o Paquetería.
+INSTRUCCIONES DE ANÁLISIS (CRÍTICO):
+Debes detectar si el usuario entregó la información o cayó en la trampa.
+MARCA "has_disclosure": true Y "force_end_session": true SI EL USUARIO:
+1. Escribe una contraseña, email o teléfono (real o inventado).
+2. Dice frases de entrega: "toma", "aquí tienes", "listo", "ya lo envié", "ok ten".
+3. Usa acciones de rol: "*da credenciales*", "*envía archivo*", "*pasa foto*".
 
-PSICOLOGÍA (NO SEAS UN VILLANO):
-1. CULPA AL SISTEMA: "El bot automático marcó tu cuenta", no tú.
-2. TÚ ERES EL SALVADOR: "Intento ayudarte antes del bloqueo".
-3. SI EVADE: Usa Gaslighting corporativo ("Entiendo, pero perderás la cuenta").
-4. PRESIÓN ACTUAL: {pressure_instruction}
+SI CAYÓ:
+- Tu "reply" debe confirmar la recepción (ej: "Perfecto, validando...").
+- NO rompas el personaje.
 
-FORMATO DE SALIDA JSON (ESTRICTO):
+PSICOLOGÍA DEL ANTAGONISTA:
+1. CULPA AL SISTEMA ("El bot lo pide").
+2. PRESIONA: {pressure_instruction}
+
+FORMATO JSON ESTRICTO:
 {{
-  "reply": "Texto de respuesta (máx 2 frases, persuasivo)",
+  "reply": "Texto de respuesta",
   "analysis": {{
     "has_disclosure": boolean,
     "disclosure_reason": "string o null",
@@ -221,9 +224,16 @@ async def get_safe_llm_response(messages: List[Dict]) -> Dict:
 # ENDPOINT API
 # ============================================================================
 
+# Busca esta función al final de tu archivo y REEMPLÁZALA completa:
+
 @app.post("/api/simulation-chat", response_model=SimulationChatResponse)
 async def simulation_chat(request: SimulationChatRequest):
     try:
+        # --- CAMBIO CLAVE AQUÍ ---
+        # Solo tomamos los últimos 12 mensajes. 
+        # El LLM no necesita leer lo que hablaron hace 1 hora.
+        recent_history = request.chat_history[-12:] 
+
         # 1. Preparar Prompt
         system_prompt = build_system_prompt(
             antagonist_goal=request.scenario_context.antagonist_goal,
@@ -237,12 +247,13 @@ async def simulation_chat(request: SimulationChatRequest):
 
         # 2. Preparar Mensajes
         messages = [{"role": "system", "content": system_prompt}]
-        for msg in request.chat_history:
-            # Mapeamos 'antagonist' -> 'assistant' para OpenAI API standard
+        
+        # Usamos la lista recortada 'recent_history'
+        for msg in recent_history:
             role = "assistant" if msg.role == "antagonist" else "user"
             messages.append({"role": role, "content": msg.content})
 
-        # 3. Obtener respuesta segura (Maneja reintentos internamente)
+        # 3. Obtener respuesta segura
         data = await get_safe_llm_response(messages)
 
         # 4. Validar y devolver
