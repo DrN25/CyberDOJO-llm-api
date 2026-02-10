@@ -31,7 +31,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Cascada de modelos (de gratis a premium)
 MODELS = [
     {
-        "name": "meta-llama/llama-3.3-70b-instruct:free",
+        "name": "google/gemini-3-flash-preview",
         "timeout": 60,
         "json_mode": True,
         "cost": "free"
