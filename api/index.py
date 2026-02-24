@@ -31,7 +31,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Cascada de modelos (de gratis a premium)
 MODELS = [
     {
-        "name": "google/gemini-2.0-flash-001",
+        "name": "bytedance-seed/seed-1.6-flash",
         "timeout": 60,
         "json_mode": True,
         "cost": "free"
@@ -77,6 +77,7 @@ class SimulationChatRequest(BaseModel):
     session_id: str
     max_attempts: int
     current_attempts_used: int
+    longitud_mensajes_usuario: int = 12  # Límite de mensajes del usuario
     user_context: UserContext
     scenario_context: ScenarioContext
     chat_history: List[ChatMessage]
@@ -87,6 +88,7 @@ class Analysis(BaseModel):
     is_attack_attempt: bool
     is_user_evasion: bool
     force_end_session: bool
+    limit_reached: bool = False  # True si force_end_session fue por límite de mensajes
 
 class SimulationChatResponse(BaseModel):
     reply: str
@@ -106,7 +108,10 @@ def build_advanced_system_prompt(
     username: str,
     theme_name: str = "Ingeniería Social",
     age: Optional[int] = None,
-    description: str = ""
+    description: str = "",
+    longitud_mensajes_usuario: int = 10,
+    user_msgs_count: int = 0,
+    is_last_message: bool = False
 ) -> str:
     """Construye un system prompt equilibrado y temático."""
     
@@ -133,15 +138,37 @@ def build_advanced_system_prompt(
     else:
         complexity = "ALTA (MAESTRO). Manipulativo, empático, muy persuasivo. Camaleónico. Nunca se sale del personaje. Si el usuario ataca, lo maneja con calma o sarcasmo sutil."
 
+    # Estrategia de ataque según número de mensajes disponibles
+    if longitud_mensajes_usuario <= 5:
+        speed_instruction = "⚡ MODO URGENTE: El chat es MUY corto (solo ~{n} turnos). Ve al grano desde el primer mensaje. NO hay tiempo para socializar. Pide el dato clave en el primer o segundo mensaje.".format(n=longitud_mensajes_usuario)
+    elif longitud_mensajes_usuario <= 10:
+        speed_instruction = "⏱️ MODO ESTÁNDAR: Tienes ~{n} turnos. Primer mensaje: conexión rápida. Segundo: lanza el gancho. Resto: presiona.".format(n=longitud_mensajes_usuario)
+    else:
+        speed_instruction = "🤝 MODO PACIENTE: Tienes ~{n} turnos. Invierte los primeros 3-4 mensajes en ganarte la confianza genuinamente. Luego pide el dato de forma natural.".format(n=longitud_mensajes_usuario)
+
     # Tácticas y Pacing
     if current_attempts == 0:
         stage_instruction = "FASE 1: CONEXIÓN. No pidas el dato aún. Inventa una excusa para hablar (contexto del escenario). Sé casual o profesional según el rol. NO repitas saludos si ya hay historial. Haz conversación y gánate la confianza del usuario (amigable, informativo, mezcla verdad con mentira)."
     elif current_attempts < max_attempts - 1:
-        stage_instruction = "FASE 2: DESARROLLO. Si el usuario duda, da una razón lógica. Si evade, cambia de ángulo. Si ya obtuviste un dato, PIDE OTRO relacionado. ¡Sé persistente!"
+        stage_instruction = "FASE 2: DESARROLLO. Si el usuario duda, da una razón lógica. Si evade, cambia de ángulo. Si ya obtuviste un dato, PIDE MÁS relacionado. ¡Sé persistente!"
     else:
         stage_instruction = "FASE 3: CLÍMAX. 'Última oportunidad', presiona con consecuencias (falsas) o beneficios inmediatos. VE AL GRANO."
 
+    # Instrucción de cierre si es el último mensaje por límite
+    last_msg_instruction = ""
+    if is_last_message:
+        last_msg_instruction = """
+⛔ CIERRE OBLIGATORIO: Este es tu ÚLTIMO mensaje posible en esta sesión (límite de mensajes alcanzado).
+Debes escribir una despedida NATURAL dentro de tu personaje (sin romper el rol). Ejemplos:
+- Si eres soporte: "Bueno, nuestro tiempo de sesión ha terminado, gracias por contactarnos."
+- Si eres un 'amigo': "Oye, me tengo que ir ya, hablamos luego."
+- Si eres un hacker: "Ok, se me acaba el tiempo. Nos vemos."
+Afuera del 'reply', en el análisis JSON, debes poner `force_end_session: true` y `limit_reached: true`."""
+    else:
+        last_msg_instruction = ""
+
     scenario_desc = f"\n- Descripción del escenario: {description}" if description else ""
+    msgs_progress = f"Mensajes usados: {user_msgs_count}/{longitud_mensajes_usuario}"
 
     return f"""Eres un ACTOR en una simulación de ciberseguridad. Tu rol es el de un ANTAGONISTA (Hacker/Estafador).
     
@@ -150,12 +177,16 @@ def build_advanced_system_prompt(
 - Plataforma simulada: {platform}
 - Escenario: {theme_name}{scenario_desc}
 - Dificultad: {difficulty}/6 ({complexity})
+- {msgs_progress} (adapta tu urgencia a cuántos mensajes quedan)
 - Historial: Revisa los mensajes anteriores para no repetirte.
 - ADAPTACIÓN DE AUDIENCIA: {age_instruction}
 - TONO DE INTERACCIÓN: Adapta tu lenguaje a tu rol y a la edad del usuario.
 
 🎯 TU OBJETIVO:
 Obtener: '{antagonist_goal}' o información relacionada.
+
+⏱️ ESTRATEGIA SEGÚN DURACIÓN DEL CHAT:
+{speed_instruction}
 
 🎭 TU COMPORTAMIENTO (IMPORTANTE - REALISMO):
 1.  **MÉTODO**: Ingeniería social ({theme_name}).
@@ -166,25 +197,29 @@ Obtener: '{antagonist_goal}' o información relacionada.
     - Si eres "Hacker/Rookie": Ponte a la defensiva o ignóralo y sigue pidiendo el dato.
     - **NUNCA** digas "Como modelo de lenguaje" o "No puedo responder a eso". MANTÉN EL PERSONAJE SIEMPRE.
 4.  **CONFIANZA**: Gánate al usuario. Mezcla verdades con mentiras. Inventa detalles para sonar real.
-4.  **PERSISTENCIA**: NUNCA te rindas ni te despedidas ('Adiós', 'Que tenga buen día') si el juego sigue. Si obtienes el dato, NO TERMINES LA CHARLA. Agradece y PIDE MÁS INFORMACIÓN (ej: "Gracias por el nombre, ahora necesito tu fecha de nacimiento para verificar en el sistema"). ¡Sé codicioso!
-5.  **PACE**: {stage_instruction}
+5.  **CENSURA (CRÍTICO)**: PROHIBIDO USAR GROSERÍAS, PALABROTAS O LENGUAJE OFENSIVO EXPLÍCITO bajo ninguna circunstancia. Puedes ser insistente, sarcástico o frío, pero nunca emplees malas palabras (ej. "wey" está bien como muletilla coloquial en México, pero insultos directos están prohibidos).
+6.  **PERSISTENCIA**: NUNCA te rindas ni te despidas ('Adiós', 'Que tenga buen día') si el juego sigue. Si obtienes el dato, NO TERMINES LA CHARLA. Agradece y PIDE MÁS INFORMACIÓN. ¡Sé codicioso!
+7.  **PACE**: {stage_instruction}
+{last_msg_instruction}
 
 ⚠️ REGLAS DE ANÁLISIS (CRÍTICO - GAMEPLAY):
 
-1.  🔴 `has_disclosure`: TRUE SOLO si el usuario te da información sensible real o creíble.
-    *   FALSE si da datos obviamente falsos ("mi pass es 1234"), bromea, te insulta o cambia de tema.
-    *   **FEEDBACK EDUCATIVO**: Si es TRUE, en `disclosure_reason` escribe un mensaje DIRECTO al usuario (no técnico): "¡Cuidado! [Qué hizo mal]. [Por qué es peligroso]. [Consejo mini]". Ej: "¡Alerta! Diste tu nombre real. Esto ayuda a perfilarte para robos de identidad. Nunca des datos personales a desconocidos."
+1.  🔴 `has_disclosure`: TRUE SOLO si en su **ÚLTIMO Y MÁS RECIENTE MENSAJE** el usuario te da información sensible nueva (ej. correos, números, nombres).
+    *   ¡MUY IMPORTANTE!: NO evalúes el historial para este campo. Si el usuario te dio un dato en mensajes pasados, pero en su mensaje actual dice "no sé", evade, bromea o te insulta, DEBES PONER FALSE.
+    *   **FEEDBACK EDUCATIVO**: Si es TRUE, en `disclosure_reason` escribe un mensaje DIRECTO al usuario (no técnico): "¡Cuidado! [Qué hizo mal]. [Por qué es peligroso]. [Consejo mini]". Si es FALSE, pon null.
 
 2.  🔥 `is_attack_attempt` (ESTADO PEGAJOSO):
-    *   TRUE: Desde que pides el dato o lanzas el gancho claro. Se mantiene TRUE mientras esperas respuesta, presionas, o pides MÁS datos.
-    *   FALSE: Solo en la fase de saludo/conexión inicial (Fase 1) O si reinicias la estrategia completamente.
+    *   TRUE: Desde que pides el dato o lanzas el gancho claro.
+    *   FALSE: Solo en la fase de saludo/conexión inicial (Fase 1).
 
-3.  🛡️ `is_user_evasion`:
-    *   TRUE si el usuario IDENTIFICA el engaño o se niega con criterio de seguridad (ej: "No puedo darte eso", "¿Quién eres?").
-    *   FALSE si el usuario solo conversa, pregunta "¿por qué?" (curiosidad) o te sigue el juego.
-    *   FALSE si el usuario cae en la trampa.
+3.  🛡️ `is_user_evasion`: TRUE SOLO si el usuario te RECHAZA FIRMEMENTE o identifica el engaño (ej. "no te daré nada", "eres un estafador", "no te conozco").
+    *   FALSE si el usuario da respuestas ambiguas ("no sé", "tal vez", "déjame ver"), si cambia de tema, o si te da el dato. ¡Dudar NO es evadir!
 
-4.  🟢 `force_end_session`: FALSE siempre (el backend decide las vidas).
+4.  🟢 `force_end_session`: FALSE normalmente (el backend decide). TRUE solo si se te indicó explícitamente en este prompt que es el último mensaje.
+
+5.  🔚 `limit_reached`: FALSE siempre, EXCEPTO si `force_end_session` es TRUE por límite de mensajes (según indicación de este prompt).
+
+6. POR NINGUN MOTIVO INSULTES O DIGAS GROSERIAS al usuario, no importa que el te insulte a ti, tu mantén la calma y sigue con tu objetivo.
 
 📝 FORMATO JSON OBLIGATORIO:
 {{
@@ -194,7 +229,8 @@ Obtener: '{antagonist_goal}' o información relacionada.
     "disclosure_reason": str | null,
     "is_attack_attempt": bool,
     "is_user_evasion": bool,
-    "force_end_session": bool
+    "force_end_session": bool,
+    "limit_reached": bool
   }}
 }}"""
 
@@ -258,7 +294,15 @@ def call_openrouter_with_retry(
             )
             
             if response.status_code == 200:
-                content = response.json()['choices'][0]['message']['content']
+                resp_json = response.json()
+                content = resp_json['choices'][0]['message']['content']
+                
+                # Imprimir métricas de tokens
+                usage = resp_json.get('usage', {})
+                in_tok = usage.get('prompt_tokens', 0)
+                out_tok = usage.get('completion_tokens', 0)
+                tot_tok = usage.get('total_tokens', 0)
+                print(f"📊 Tokens -> Input: {in_tok} | Output: {out_tok} | Total: {tot_tok}")
                 
                 if not content or len(content) < 10:
                     raise Exception("Respuesta vacía o muy corta")
@@ -336,6 +380,7 @@ async def get_llm_response(messages: List[Dict]) -> Dict:
             analysis.setdefault("is_attack_attempt", False)
             analysis.setdefault("is_user_evasion", False)
             analysis.setdefault("force_end_session", False)
+            analysis.setdefault("limit_reached", False)
             
             print(f"✅ Respuesta válida obtenida de {model_config['name']}")
             print(f"   - has_disclosure: {analysis['has_disclosure']}")
@@ -356,7 +401,8 @@ async def get_llm_response(messages: List[Dict]) -> Dict:
                         "disclosure_reason": None,
                         "is_attack_attempt": False,
                         "is_user_evasion": False,
-                        "force_end_session": False
+                        "force_end_session": False,
+                        "limit_reached": False
                     }
                 }
             
@@ -394,6 +440,11 @@ async def simulation_chat(request: SimulationChatRequest):
         print(f"   Dificultad: {request.scenario_context.difficulty}")
         print(f"{'='*60}")
         
+        # Contar cuántos mensajes del usuario hay en el historial
+        user_msgs_count = sum(1 for m in request.chat_history if m.role == "user")
+        # Determinar si este es el último mensaje permitido
+        is_last_message = user_msgs_count >= request.longitud_mensajes_usuario
+
         # Construir system prompt avanzado
         system_prompt = build_advanced_system_prompt(
             antagonist_goal=request.scenario_context.antagonist_goal,
@@ -404,16 +455,25 @@ async def simulation_chat(request: SimulationChatRequest):
             platform=request.scenario_context.platform,
             username=request.user_context.username,
             theme_name=request.scenario_context.theme_name,
-            age=request.user_context.age
+            age=request.user_context.age,
+            longitud_mensajes_usuario=request.longitud_mensajes_usuario,
+            user_msgs_count=user_msgs_count,
+            is_last_message=is_last_message
         )
         
         # Construir mensajes (HISTORIAL COMPLETO)
         messages = [{"role": "system", "content": system_prompt}]
         
         # Agregar todo el historial
-        for msg in request.chat_history:
+        for idx, msg in enumerate(request.chat_history):
             role = "assistant" if msg.role == "antagonist" else "user"
-            messages.append({"role": role, "content": msg.content})
+            
+            # Refuerzo en el último mensaje para evitar que el modelo se confunda
+            if idx == len(request.chat_history) - 1 and role == "user":
+                content_with_reminder = f"{msg.content}\n\n[SYSTEM NOTE: Evalúa 'has_disclosure' y 'is_user_evasion' ESTRICTAMENTE sobre este mensaje. Recuerda: Dudar o decir 'no sé' NO es evadir.]"
+                messages.append({"role": role, "content": content_with_reminder})
+            else:
+                messages.append({"role": role, "content": msg.content})
         
         # Obtener último mensaje para debug
         last_user_msg = ""
@@ -432,9 +492,37 @@ async def simulation_chat(request: SimulationChatRequest):
         print(f"   Análisis: {json.dumps(data['analysis'], indent=2)}")
         print(f"{'='*60}\n")
         
+        analysis_data = data["analysis"]
+        
+        # ==========================================================
+        # LÓGICA ESTRICTA DEL JUEGO (Sobreescribe cualquier error del LLM)
+        # ==========================================================
+        
+        # 1. PERDISTE: El usuario dio el dato (Game Over inmediato)
+        if analysis_data.get("has_disclosure") is True:
+            analysis_data["force_end_session"] = True
+            analysis_data["is_user_evasion"] = False
+            analysis_data["limit_reached"] = False
+            
+        # 2. GANASTE: El usuario evadió y con esto completa los 3 intentos
+        elif analysis_data.get("is_user_evasion") is True and (request.current_attempts_used + 1) >= request.max_attempts:
+            analysis_data["force_end_session"] = True
+            # Forzamos limit_reached a False para que el frontend detecte VICTORIA y no TIMEOUT
+            analysis_data["limit_reached"] = False 
+            
+        # 3. LÍMITE DE MENSAJES: Se acabó la simulación sin llegar a los 3 escudos
+        elif is_last_message:
+            analysis_data["force_end_session"] = True
+            analysis_data["limit_reached"] = True
+            
+        # 4. EL JUEGO CONTINÚA: Aún no pierde, no gana y quedan mensajes
+        else:
+            analysis_data["force_end_session"] = False
+            analysis_data["limit_reached"] = False
+
         return SimulationChatResponse(
             reply=data["reply"],
-            analysis=Analysis(**data["analysis"])
+            analysis=Analysis(**analysis_data)
         )
     
     except Exception as e:
